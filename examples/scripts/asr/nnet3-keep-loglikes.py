@@ -22,6 +22,7 @@ from kaldi.util.options import ParseOptions
 from kaldi.util.table import SequentialWaveReader, MatrixWriter, SequentialMatrixReader
 
 chunk_size = 1440
+get_xent = False ## get cross-entropy loglikes instread of chain loglikes
 
 # Define online feature pipeline
 feat_opts = OnlineNnetFeaturePipelineConfig()
@@ -40,6 +41,10 @@ decodable_opts = NnetSimpleLoopedComputationOptions()
 decodable_opts.acoustic_scale = 1.0
 decodable_opts.frame_subsampling_factor = 3
 decodable_opts.frames_per_chunk = 50 ## smallish to force many updates
+decodable_opts.compute_config.compute_xent = get_xent
+
+llh_chunk_size = decodable_opts.frames_per_chunk // decodable_opts.frame_subsampling_factor
+
 asr = NnetLatticeFasterOnlineRecognizer.from_files(
     "final.mdl", "HCLG.fst", "words.txt",
     decoder_opts=decoder_opts,
@@ -60,31 +65,40 @@ with MatrixWriter("ark:loglikes.ark") as llout:
         prev_num_frames_computed = 0
         llhs = list()
         for i in range(0, len(data), chunk_size):
-            if i + chunk_size >= len(data):
-                last_chunk = True
             feat_pipeline.accept_waveform(wav.samp_freq, data[i:i + chunk_size])
-            if last_chunk:
-                feat_pipeline.input_finished()
             nr = d.num_frames_ready()
             if nr > prev_num_frames_computed:
-                x = d.log_likelihoods(prev_num_frames_computed, nr - prev_num_frames_computed).numpy()
+                x = d.log_likelihoods(prev_num_frames_computed,
+                                      nr - prev_num_frames_computed,
+                                      get_xent).numpy()
                 llhs.append(x)
                 prev_num_frames_computed = nr
-            asr.advance_decoding()
+                asr.advance_decoding()
             num_frames_decoded = asr.decoder.num_frames_decoded()
-            if not last_chunk:
-                if num_frames_decoded > prev_num_frames_decoded:
-                    prev_num_frames_decoded = num_frames_decoded
-                    out = asr.get_partial_output()
-                    print(key + "-part%d" % part, out["text"], flush=True)
-                    part += 1
+            if num_frames_decoded > prev_num_frames_decoded:
+                prev_num_frames_decoded = num_frames_decoded
+                out = asr.get_partial_output()
+                print(key + "-part%d" % part, out["text"], flush=True)
+                part += 1
+        last_nr = d.num_frames_ready()
+        feat_pipeline.input_finished()
+        nr = d.num_frames_ready()
+        ## we must be very careful in getting the llhs, we can't demand more than
+        ## llh_chunk_size at once
+        for start in range(last_nr, nr, llh_chunk_size):
+            length = min(llh_chunk_size, nr - start)
+            x = d.log_likelihoods(start, length,
+                                  get_xent).numpy()
+            llhs.append(x)
+            asr.advance_decoding(length)
+
         asr.finalize_decoding()
         out = asr.get_output()
         print(key + "-final", out["text"], flush=True)
 
         llout[key] = numpy.concatenate(llhs, axis=0)
 
-# Do it again, Sam, but perhaps with a different HCLG.fst
+# Play it again, Sam, but perhaps with a different HCLG.fst
 
 # Decode log-likelihoods stored as kaldi matrices.
 asr = MappedLatticeFasterRecognizer.from_files(

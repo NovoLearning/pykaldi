@@ -31,11 +31,11 @@ from "nnet3/decodable-online-looped.h":
       def `FrameSubsamplingFactor` as frame_subsampling_factor(self) -> int:
         """Returns the frame subsampling factor."""
 
-      def `LogLikelihoods` as log_likelihoods_frame(self, frame: int) -> Vector:
+      def `LogLikelihoods` as log_likelihoods_frame(self, frame: int, get_xent: bool) -> Vector:
         """Returns the log-likelihoods for the given frame"""
         return _vector_wrapper(...)
 
-      def `LogLikelihoods` as log_likelihoods(self, frame: int, num_frames: int) -> Matrix:
+      def `LogLikelihoods` as log_likelihoods(self, frame: int, num_frames: int, get_xent: bool) -> Matrix:
         """Returns the log-likelihoods for the given frames"""
 	return _matrix_wrapper(...)
 
@@ -61,11 +61,11 @@ from "nnet3/decodable-online-looped.h":
       def `FrameSubsamplingFactor` as frame_subsampling_factor(self) -> int:
         """Returns the frame subsampling factor."""
 
-      def `LogLikelihoods` as log_likelihoods_frame(self, frame: int) -> Vector:
+      def `LogLikelihoods` as log_likelihoods_frame(self, frame: int, get_xent: bool) -> Vector:
         """Returns the log-likelihoods for the given frame"""
 	return _vector_wrapper(...)
 
-      def `LogLikelihoods` as log_likelihoods(self, frame: int, num_frames: int) -> Matrix:
+      def `LogLikelihoods` as log_likelihoods(self, frame: int, num_frames: int, get_xent: bool) -> Matrix:
         """Returns the log-likelihoods for the given frames"""
 	return _matrix_wrapper(...)
 
